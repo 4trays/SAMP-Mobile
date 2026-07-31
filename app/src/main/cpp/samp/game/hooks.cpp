@@ -1,4 +1,5 @@
 #include <GLES2/gl2.h>
+#include <sys/stat.h>
 #include "../main.h"
 #include "../vendor/armhook/patch.h"
 #include "game.h"
@@ -1204,6 +1205,31 @@ void CRadar_ClearBlip_hook(uint32_t a2)
 	}
 }
 
+float (*CEntity__GetDistanceFromCentreOfMassToBaseOfModel)(uintptr_t thiz);
+float CEntity__GetDistanceFromCentreOfMassToBaseOfModel_hook(uintptr_t thiz)
+{
+	if(!thiz)
+		return 0.0f;
+
+	// The game resolves a model-info chain: x9 = *(g_libGTASA + 0x850db8);
+	// x8 = x9[type]; x8 = *(x8 + 0x30); then reads *(float*)(x8 + 0x8).
+	// When a script references an object whose model info is not loaded the
+	// chain is null and the game faults at +0x4cdcd0 (fault address 0x8).
+	uint8_t type = (*(uint8_t*)(thiz + 0x5a)) & 0xf;
+	if(type != 2)
+	{
+		uintptr_t table = *(uintptr_t*)(g_libGTASA + 0x850db8);
+		if(!table)
+			return 0.0f;
+
+		uintptr_t entry = ((uintptr_t*)table)[type];
+		if(!entry || !*(uintptr_t*)(entry + 0x30))
+			return 0.0f;
+	}
+
+	return CEntity__GetDistanceFromCentreOfMassToBaseOfModel(thiz);
+}
+
 /* =============================================================================== */
 
 void InstallHuaweiCrashFixHooks()
@@ -1221,6 +1247,7 @@ void InstallCrashFixHooks()
 	CHook::InstallPLT(g_libGTASA + 0x671458, (uintptr_t)CPed_UpdatePosition_hook, (uintptr_t*)&CPed_UpdatePosition);
 	CHook::InstallPLT(g_libGTASA + 0x675490, (uintptr_t)RwFrameAddChild_hook, (uintptr_t*)&RwFrameAddChild);
 	CHook::InstallPLT(g_libGTASA + 0x672D14, (uintptr_t)CTextureDatabaseRuntime__GetEntry_hook, (uintptr_t*)&CTextureDatabaseRuntime__GetEntry);
+	CHook::InstallPLT(g_libGTASA + 0x843FC0, (uintptr_t)CEntity__GetDistanceFromCentreOfMassToBaseOfModel_hook, (uintptr_t*)&CEntity__GetDistanceFromCentreOfMassToBaseOfModel);
 	//CHook::InstallPLT(g_libGTASA + 0x66FBD0, (uintptr_t)RpClumpForAllAtomics_hook, (uintptr_t*)&RpClumpForAllAtomics);
 	CHook::InstallPLT(g_libGTASA + 0x6730F0, (uintptr_t)rpMaterialListDeinitialize_hook, (uintptr_t*)&rpMaterialListDeinitialize);
 	//CHook::InstallPLT(g_libGTASA + 0x6778B0, (uintptr_t)rxOpenGLDefaultAllInOneRenderCB_hook, (uintptr_t*)&rxOpenGLDefaultAllInOneRenderCB);
@@ -1331,6 +1358,27 @@ struct stFile
 
 char lastFile[123];
 
+void CreateDirRecursive(const char* path)
+{
+	char tmp[256];
+	snprintf(tmp, sizeof(tmp), "%s", path);
+
+	size_t len = strlen(tmp);
+	if(len > 1 && tmp[len - 1] == '/')
+		tmp[len - 1] = '\0';
+
+	for(char* p = tmp + 1; *p; p++)
+	{
+		if(*p == '/')
+		{
+			*p = '\0';
+			mkdir(tmp, 0755);
+			*p = '/';
+		}
+	}
+	mkdir(tmp, 0755);
+}
+
 stFile* NvFOpen(const char* r0, const char* r1, int r2, int r3)
 {
     strcpy(lastFile, r1);
@@ -1414,7 +1462,33 @@ stFile* NvFOpen(const char* r0, const char* r1, int r2, int r3)
 #endif
     st->isFileExist = false;
 
+    const char* texdbPath = r1;
+    if(*texdbPath == '/') texdbPath++;
+
     FILE *f  = fopen(path, "rb");
+
+    if(!f && !strncmp(texdbPath, "texdb/", 6))
+    {
+        // texdb only holds compressed UI textures. If a texdb file is missing
+        // we must still hand the game a valid empty file, otherwise its loaders
+        // treat the null handle as readable and crash in
+        // TextureDatabaseRuntime::SortEntries during startup.
+        char* slash = strrchr(path, '/');
+        if(slash)
+        {
+            *slash = '\0';
+            CreateDirRecursive(path);
+            *slash = '/';
+
+            f = fopen(path, "ab+");
+            if(f)
+            {
+                fclose(f);
+                f = fopen(path, "rb");
+                FLog("NVFOpen hook | created empty placeholder (%s)", path);
+            }
+        }
+    }
 
     if(f)
     {

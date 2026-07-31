@@ -285,7 +285,7 @@ public class SplashActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
 
-        if (prefs.getBoolean("firstrun", true)) {
+        if (prefs != null && prefs.getBoolean("firstrun", true)) {
             new SharedPreferenceCore().setInt(getApplicationContext(), "FPS_LIMIT", 60);
             new SharedPreferenceCore().setInt(getApplicationContext(), "MESSAGE_COUNT", 6);
             new SharedPreferenceCore().setBoolean(getApplicationContext(), "AIM", false);

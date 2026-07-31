@@ -1213,19 +1213,19 @@ float CEntity__GetDistanceFromCentreOfMassToBaseOfModel_hook(uintptr_t thiz)
 
 	// The game resolves a model-info chain: x9 = *(g_libGTASA + 0x850db8);
 	// x8 = x9[type]; x8 = *(x8 + 0x30); then reads *(float*)(x8 + 0x8).
-	// When a script references an object whose model info is not loaded the
+	// When a script references an entity whose model info is not loaded the
 	// chain is null and the game faults at +0x4cdcd0 (fault address 0x8).
 	uint8_t type = (*(uint8_t*)(thiz + 0x5a)) & 0xf;
-	if(type != 2)
-	{
-		uintptr_t table = *(uintptr_t*)(g_libGTASA + 0x850db8);
-		if(!table)
-			return 0.0f;
+	if(type > 4)
+		return 0.0f;
 
-		uintptr_t entry = ((uintptr_t*)table)[type];
-		if(!entry || !*(uintptr_t*)(entry + 0x30))
-			return 0.0f;
-	}
+	uintptr_t table = *(uintptr_t*)(g_libGTASA + 0x850db8);
+	if(!table)
+		return 0.0f;
+
+	uintptr_t entry = ((uintptr_t*)table)[type];
+	if(!entry || !*(uintptr_t*)(entry + 0x30))
+		return 0.0f;
 
 	return CEntity__GetDistanceFromCentreOfMassToBaseOfModel(thiz);
 }
@@ -1247,7 +1247,7 @@ void InstallCrashFixHooks()
 	CHook::InstallPLT(g_libGTASA + 0x671458, (uintptr_t)CPed_UpdatePosition_hook, (uintptr_t*)&CPed_UpdatePosition);
 	CHook::InstallPLT(g_libGTASA + 0x675490, (uintptr_t)RwFrameAddChild_hook, (uintptr_t*)&RwFrameAddChild);
 	CHook::InstallPLT(g_libGTASA + 0x672D14, (uintptr_t)CTextureDatabaseRuntime__GetEntry_hook, (uintptr_t*)&CTextureDatabaseRuntime__GetEntry);
-	CHook::InstallPLT(g_libGTASA + 0x843FC0, (uintptr_t)CEntity__GetDistanceFromCentreOfMassToBaseOfModel_hook, (uintptr_t*)&CEntity__GetDistanceFromCentreOfMassToBaseOfModel);
+	CHook::InlineHook(g_libGTASA + 0x4cdcd0, &CEntity__GetDistanceFromCentreOfMassToBaseOfModel_hook, &CEntity__GetDistanceFromCentreOfMassToBaseOfModel);
 	//CHook::InstallPLT(g_libGTASA + 0x66FBD0, (uintptr_t)RpClumpForAllAtomics_hook, (uintptr_t*)&RpClumpForAllAtomics);
 	CHook::InstallPLT(g_libGTASA + 0x6730F0, (uintptr_t)rpMaterialListDeinitialize_hook, (uintptr_t*)&rpMaterialListDeinitialize);
 	//CHook::InstallPLT(g_libGTASA + 0x6778B0, (uintptr_t)rxOpenGLDefaultAllInOneRenderCB_hook, (uintptr_t*)&rxOpenGLDefaultAllInOneRenderCB);
@@ -1465,28 +1465,25 @@ stFile* NvFOpen(const char* r0, const char* r1, int r2, int r3)
     const char* texdbPath = r1;
     if(*texdbPath == '/') texdbPath++;
 
+    const char* pSuffix = strrchr(texdbPath, '.');
+    bool isTexDbFile = !strncmp(texdbPath, "texdb/", 6)
+        || (pSuffix && (!strcmp(pSuffix, ".idx") || !strcmp(pSuffix, ".texdb")));
+
     FILE *f  = fopen(path, "rb");
 
-    if(!f && !strncmp(texdbPath, "texdb/", 6))
+    if(f && isTexDbFile)
     {
-        // texdb only holds compressed UI textures. If a texdb file is missing
-        // we must still hand the game a valid empty file, otherwise its loaders
-        // treat the null handle as readable and crash in
-        // TextureDatabaseRuntime::SortEntries during startup.
-        char* slash = strrchr(path, '/');
-        if(slash)
-        {
-            *slash = '\0';
-            CreateDirRecursive(path);
-            *slash = '/';
+        // A 0-byte texture db makes TextureDatabaseRuntime::SortEntries parse
+        // an empty buffer as real data and crash. Treat empty files as missing.
+        fseek(f, 0, SEEK_END);
+        long nSize = ftell(f);
+        fseek(f, 0, SEEK_SET);
 
-            f = fopen(path, "ab+");
-            if(f)
-            {
-                fclose(f);
-                f = fopen(path, "rb");
-                FLog("NVFOpen hook | created empty placeholder (%s)", path);
-            }
+        if(nSize == 0)
+        {
+            fclose(f);
+            f = NULL;
+            FLog("NVFOpen hook | ignoring empty texture db (%s)", path);
         }
     }
 
@@ -1494,6 +1491,17 @@ stFile* NvFOpen(const char* r0, const char* r1, int r2, int r3)
     {
         st->isFileExist = true;
         st->f = f;
+        return st;
+    }
+    else if(isTexDbFile)
+    {
+        // texdb only holds compressed UI textures. When a texture db is missing
+        // we must still hand the game a valid handle flagged as not present,
+        // otherwise its loaders treat the null handle as readable and crash in
+        // TextureDatabaseRuntime::SortEntries during startup.
+        st->isFileExist = false;
+        st->f = NULL;
+        FLog("NVFOpen hook | missing texture db, returning empty handle (%s)", path);
         return st;
     }
     else
@@ -1680,6 +1688,13 @@ size_t (*OS_FileRead)(OSFile a1, void *buffer, size_t numBytes);
 size_t OS_FileRead_hook(OSFile a1, void *buffer, size_t numBytes)
 {
     dwRLEDecompressSourceSize = numBytes;
+
+    if(!a1 || !buffer || numBytes == 0)
+    {
+        if(buffer && numBytes)
+            memset(buffer, 0, numBytes);
+        return 0;
+    }
 
     return OS_FileRead(a1, buffer, numBytes);
 }

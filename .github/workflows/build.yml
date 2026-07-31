@@ -2,7 +2,7 @@ name: Build APK
 
 on:
   push:
-    branches: [ GTA-2.11 ]
+    branches: [ GTA-2.10 ]
   workflow_dispatch:
 
 jobs:

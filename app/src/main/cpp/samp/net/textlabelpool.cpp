@@ -152,11 +152,11 @@ void C3DTextLabelPool::Draw(ImGuiRenderer* renderer, TEXT_LABEL* label, CVector 
 		}
 
 		CPlayerPool *pLocalPool = pNetGame->GetPlayerPool();
-		CPlayerPed *pLocalPed = pLocalPool ? pLocalPool->GetLocalPlayer() : nullptr;
-		if (!pLocalPed || !pLocalPed->GetPlayerPed() || !pLocalPed->GetPlayerPed()->m_pPed)
+		CLocalPlayer *pLocalPlayer = pLocalPool ? pLocalPool->GetLocalPlayer() : nullptr;
+		if (!pLocalPlayer || !pLocalPlayer->GetPlayerPed() || !pLocalPlayer->GetPlayerPed()->m_pPed)
 			return;
 
-        RwMatrix matPlayer = pLocalPed->GetPlayerPed()->m_pPed->GetMatrix().ToRwMatrix();
+        RwMatrix matPlayer = pLocalPlayer->GetPlayerPed()->m_pPed->GetMatrix().ToRwMatrix();
 
 		CVector vec;
 		vec.x = pCam->pos1x;
@@ -175,7 +175,7 @@ void C3DTextLabelPool::Draw(ImGuiRenderer* renderer, TEXT_LABEL* label, CVector 
 
 	if (!label->bTestLOS || hitEntity) {
 		CPlayerPool *pPool = pNetGame->GetPlayerPool();
-		CPlayerPed *pLocal = pPool ? pPool->GetLocalPlayer() : nullptr;
+		CLocalPlayer *pLocal = pPool ? pPool->GetLocalPlayer() : nullptr;
 		if (pLocal && pLocal->GetPlayerPed() && pLocal->GetPlayerPed()->m_pPed &&
 			pLocal->GetPlayerPed()->m_pPed->GetDistanceFromPoint(vecPos.x, vecPos.y, vecPos.z) <= label->fDistance) {
 			CVector vecOut;

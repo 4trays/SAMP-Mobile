@@ -20,11 +20,12 @@ public class WarMedia extends WarGamepad
         {
             try
             {
-                File externalFilesDir = getExternalFilesDir(null);
-                String absolutePath = externalFilesDir.getAbsolutePath();
-                this.baseDirectoryRoot = absolutePath.substring(0, absolutePath.indexOf("/Android"));
-                return externalFilesDir.getAbsolutePath() + "/";
-                //return Environment.getExternalStorageDirectory() + "/SAMPMOBILE/";
+                File sampDir = new File(Environment.getExternalStorageDirectory(), "SAMP");
+                if (!sampDir.exists()) {
+                    sampDir.mkdirs();
+                }
+                this.baseDirectoryRoot = Environment.getExternalStorageDirectory().getAbsolutePath();
+                return sampDir.getAbsolutePath() + "/";
             } catch (Exception e)
             {
             }

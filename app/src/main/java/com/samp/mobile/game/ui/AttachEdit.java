@@ -154,30 +154,24 @@ public class AttachEdit {
     }
 
     public void SelectetItem(View view){
-        attach_leftright.getChildAt(0).setBackgroundTintList(null);
-        //attach_leftright.getChildAt(2).setBackgroundTintList(null);
-
-        attach_topbott.getChildAt(0).setBackgroundTintList(null);
-        //attach_topbott.getChildAt(2).setBackgroundTintList(null);
-
-        attach_pushpull.getChildAt(0).setBackgroundTintList(null);
-        //attach_pushpull.getChildAt(2).setBackgroundTintList(null);
-
-        attach_scale.getChildAt(0).setBackgroundTintList(null);
-        //attach_scale.getChildAt(2).setBackgroundTintList(null);
-
-        attach_rotX.getChildAt(0).setBackgroundTintList(null);
-        //attach_rotX.getChildAt(2).setBackgroundTintList(null);
-
-        attach_rotY.getChildAt(0).setBackgroundTintList(null);
-        //attach_rotY.getChildAt(2).setBackgroundTintList(null);
-
-        attach_rotZ.getChildAt(0).setBackgroundTintList(null);
-        //attach_rotZ.getChildAt(2).setBackgroundTintList(null);
+        resetTint(attach_leftright);
+        resetTint(attach_topbott);
+        resetTint(attach_pushpull);
+        resetTint(attach_scale);
+        resetTint(attach_rotX);
+        resetTint(attach_rotY);
+        resetTint(attach_rotZ);
 
         ConstraintLayout tmp = (ConstraintLayout) view;
-        tmp.getChildAt(0).setBackgroundTintList(ColorStateList.valueOf(activity.getResources().getColor(R.color.colorAccent)));
-        //tmp.getChildAt(2).setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#000000")));
+        if (tmp.getChildCount() > 0 && tmp.getChildAt(0) != null) {
+            tmp.getChildAt(0).setBackgroundTintList(ColorStateList.valueOf(activity.getResources().getColor(R.color.colorAccent)));
+        }
+    }
+
+    private void resetTint(ConstraintLayout layout) {
+        if (layout.getChildCount() > 0 && layout.getChildAt(0) != null) {
+            layout.getChildAt(0).setBackgroundTintList(null);
+        }
     }
     //
     int fix_move = 0;

@@ -252,12 +252,8 @@ public class DialogManager {
             StringBuilder sb = new StringBuilder(this.mText);
             for (int i2 = 0; i2 < sb.length(); i2++) {
                 if (sb.charAt(i2) == 9 && i2 < sb.length() - 1) {
-                    while (true) {
-                        int i3 = i2 + 1;
-                        if (sb.charAt(i3) != 9) {
-                            break;
-                        }
-                        sb.deleteCharAt(i3);
+                    while (i2 + 1 < sb.length() && sb.charAt(i2 + 1) == 9) {
+                        sb.deleteCharAt(i2 + 1);
                     }
                 }
             }

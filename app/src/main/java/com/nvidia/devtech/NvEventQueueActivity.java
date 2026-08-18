@@ -261,6 +261,9 @@ public abstract class NvEventQueueActivity extends AppCompatActivity implements 
                 {
                 }
             }
+            if (is == null) {
+                return ret;
+            }
             int size = is.available();
             ret.length = size;
             ret.data = new byte[size];

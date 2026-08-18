@@ -72,7 +72,7 @@ bool CPhysical::IsAdded()
         if(*(uintptr*)this == g_libGTASA + (VER_x32 ? 0x00667D14 : 0x830098)) // CPlaceable
             return false;
 
-        if(*(uintptr_t*)m_pMovingList)
+        if(m_pMovingList)
             return true;
     }
 
